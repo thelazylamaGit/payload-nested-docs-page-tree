@@ -4,6 +4,7 @@ import type { NestedDocsPageTreePluginCollectionCustom } from '../types.js'
 
 import { nestedDocsPageTreePluginCustomKey } from '../types.js'
 import { normalizeNestedDocsPageTreePluginBadgeConfig } from './badgeConfig.js'
+import { resolveCollapseAnimationConfig } from './collapseAnimation.js'
 
 export function getCollectionPageTreeConfig(
   collection: Pick<CollectionConfig, 'custom'>,
@@ -33,6 +34,9 @@ export function getCollectionPageTreeConfig(
     badges: normalizeNestedDocsPageTreePluginBadgeConfig(config.badges),
     badgesLinks: config.badgesLinks,
     breadcrumbsFieldSlug: config.breadcrumbsFieldSlug,
+    collapseAnimation: resolveCollapseAnimationConfig(
+      config.collapseAnimation?.enabled === false ? false : config.collapseAnimation,
+    ),
     defaultLimit: config.defaultLimit,
     fastMode: config.fastMode === true,
     hideBreadcrumbs: config.hideBreadcrumbs,

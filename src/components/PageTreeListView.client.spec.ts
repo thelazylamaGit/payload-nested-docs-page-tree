@@ -53,6 +53,17 @@ function getDescriptionIDs(html: string): string[] {
   return Array.from(html.matchAll(/aria-describedby="([^"]+)"/g), (match) => match[1])
 }
 
+describe('PageTreeListViewClient collapse animation markup', () => {
+  it('leaves cell markup unchanged and marks no rows as animating on load', () => {
+    const html = renderToString(React.createElement(PageTreeListViewClient, props))
+
+    expect(html).toContain('data-page-tree-row="true"')
+    expect(html).toContain('data-page-tree-id="home"')
+    expect(html).not.toContain('data-tree-anim')
+    expect(html).not.toContain('pages-hierarchy-collapse')
+  })
+})
+
 describe('PageTreeListViewClient accessibility IDs', () => {
   it('keeps drag handle descriptions stable across unrelated context renders', () => {
     const tree = React.createElement(PageTreeListViewClient, props)

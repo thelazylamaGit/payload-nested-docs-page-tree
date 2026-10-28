@@ -65,7 +65,8 @@
   border-radius: 0;
 }
 
-.root :global(.pages-hierarchy-table .table tbody tr[data-page-tree-row='true'] td) {
+.root :global(.pages-hierarchy-table .table tbody tr[data-page-tree-row='true'] td),
+.root :global(.pages-hierarchy-table .table tbody tr[data-tree-anim='closing'] td) {
   border-top: 1px solid var(--theme-elevation-100);
 }
 

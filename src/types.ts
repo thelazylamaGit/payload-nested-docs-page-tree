@@ -35,6 +35,13 @@ export type NestedDocsPageTreePluginHomeIndicatorConfig =
     }
   | false
 
+export type NestedDocsPageTreePluginCollapseAnimationConfig =
+  | {
+      /** @default 200 */
+      durationMs?: number
+    }
+  | boolean
+
 export type NestedDocsPageTreePluginResolvedHomeIndicatorConfig = {
   enabled: boolean
 }
@@ -63,6 +70,12 @@ export type NestedDocsPageTreePluginConfig = {
   /** Opt in to status badge links. Preview uses the collection's admin.preview. */
   badgesLinks?: NestedDocsPageTreePluginBadgesLinks
   breadcrumbsFieldSlug?: string
+  /**
+   * Animate nested rows when a parent is expanded or collapsed. Rows toggle
+   * instantly when the user prefers reduced motion.
+   * @default true
+   */
+  collapseAnimation?: NestedDocsPageTreePluginCollapseAnimationConfig
   collections: CollectionSlug[]
   defaultLimit?: number
   /**
@@ -102,6 +115,10 @@ export type NestedDocsPageTreePluginCollectionCustom = {
   badges: NestedDocsPageTreePluginResolvedBadgeConfig
   badgesLinks?: NestedDocsPageTreePluginBadgesLinks
   breadcrumbsFieldSlug: string
+  collapseAnimation: {
+    durationMs: number
+    enabled: boolean
+  }
   defaultLimit: number
   fastMode?: boolean
   hideBreadcrumbs: boolean

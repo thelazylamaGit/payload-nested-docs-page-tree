@@ -14,6 +14,7 @@ import { createReorderPageEndpoint } from './endpoints/createReorderPageEndpoint
 import { nestedDocsPageTreePluginCustomKey, pageTreeWriteContextKey } from './types.js'
 import { normalizeNestedDocsPageTreePluginBadgeConfig } from './utilities/badgeConfig.js'
 import { withChildValidationErrors } from './utilities/childValidationErrors.js'
+import { resolveCollapseAnimationConfig } from './utilities/collapseAnimation.js'
 import {
   createFlowID,
   type Diagnostics,
@@ -213,6 +214,7 @@ function buildCollectionCustom(args: {
   badges: NestedDocsPageTreePluginCollectionCustom['badges']
   badgesLinks?: NestedDocsPageTreePluginConfig['badgesLinks']
   breadcrumbsFieldSlug: string
+  collapseAnimation: NestedDocsPageTreePluginCollectionCustom['collapseAnimation']
   defaultLimit: number
   fastMode: boolean
   hideBreadcrumbs: boolean
@@ -225,6 +227,7 @@ function buildCollectionCustom(args: {
     badges,
     badgesLinks,
     breadcrumbsFieldSlug,
+    collapseAnimation,
     defaultLimit,
     fastMode,
     hideBreadcrumbs,
@@ -238,6 +241,7 @@ function buildCollectionCustom(args: {
     badges,
     badgesLinks,
     breadcrumbsFieldSlug,
+    collapseAnimation,
     defaultLimit,
     fastMode,
     hideBreadcrumbs,
@@ -263,6 +267,7 @@ export type {
   NestedDocsPageTreePluginBadgeMap,
   NestedDocsPageTreePluginBadgesLinks,
   NestedDocsPageTreePluginBadgeStatus,
+  NestedDocsPageTreePluginCollapseAnimationConfig,
   NestedDocsPageTreePluginConfig,
   NestedDocsPageTreePluginHomeIndicatorConfig,
   PageTreeLiveURL,
@@ -285,6 +290,7 @@ export const nestedDocsPageTreePlugin =
     const breadcrumbsFieldSlug =
       pluginOptions.breadcrumbsFieldSlug ?? DEFAULT_BREADCRUMBS_FIELD_SLUG
     const fastMode = pluginOptions.fastMode === true
+    const collapseAnimation = resolveCollapseAnimationConfig(pluginOptions.collapseAnimation)
     const defaultLimit = pluginOptions.defaultLimit ?? DEFAULT_LIMIT
     const hideBreadcrumbs = pluginOptions.hideBreadcrumbs ?? true
     const parentFieldSlug = pluginOptions.parentFieldSlug ?? DEFAULT_PARENT_FIELD_SLUG
@@ -355,6 +361,7 @@ export const nestedDocsPageTreePlugin =
             badges,
             badgesLinks: pluginOptions.badgesLinks,
             breadcrumbsFieldSlug,
+            collapseAnimation,
             defaultLimit,
             fastMode,
             hideBreadcrumbs,

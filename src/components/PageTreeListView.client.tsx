@@ -45,6 +45,11 @@ import type {
 } from '../types.js'
 
 import {
+  type PageTreeResolvedCollapseAnimation,
+  type PageTreeRowAnimation,
+  resolveCollapseAnimationConfig,
+} from '../utilities/collapseAnimation.js'
+import {
   buildInsertDropTargets,
   getDropTargetParentDoc,
   type PageTreeDropTarget,
@@ -63,15 +68,21 @@ import {
   type PageTreeDoc,
 } from '../utilities/pageTree.js'
 import { pageTreeCollisionDetectionStrategy } from '../utilities/pageTreeCollision.js'
+import { animateTreeSection } from './animateTreeSection.js'
 import { PageTreeProvider, PageTreeRowDndProvider } from './PageTreeContext.js'
 import styles from './PageTreeListView.module.css'
 import { PageTreeStatusBadge } from './PageTreeStatusBadge.js'
 import { PageTreeTitleCell } from './PageTreeTitleCell.js'
+import {
+  type PageTreeAnimatedDoc,
+  usePageTreeCollapseAnimation,
+} from './usePageTreeCollapseAnimation.js'
 
 type PageTreeListViewClientProps = {
   badgeConfig: NestedDocsPageTreePluginResolvedBadgeConfig
   badgesLinks?: NestedDocsPageTreePluginBadgesLinks
   canMoveDocs: boolean
+  collapseAnimation?: PageTreeResolvedCollapseAnimation
   columnState: Column[]
   homeIndicatorEnabled: boolean
   orderableFieldName?: string
@@ -135,6 +146,7 @@ type PageTreeRangeRect = {
 }
 
 const SILENT_MOVE_MESSAGES = new Set([CANCEL_DRAG_MESSAGE])
+const DEFAULT_COLLAPSE_ANIMATION = resolveCollapseAnimationConfig(undefined)
 const ALREADY_ROOT_MESSAGE = 'This page is already in root level.'
 
 function getParentMovePreferenceKey(collectionSlug: string): string {
@@ -865,7 +877,9 @@ function HierarchyTableRow({
   activeColumns,
   activeDragRowID,
   activeDragType,
+  animation,
   canReorderRows,
+  cellIndex,
   doc,
   dropValidation,
   insertAfterDropID,
@@ -877,15 +891,22 @@ function HierarchyTableRow({
   activeColumns: Column[]
   activeDragRowID: null | string
   activeDragType: null | PageTreeDragType
+  animation?: PageTreeRowAnimation
   canReorderRows: boolean
+  /** Index into each column's renderedCells, which include closing rows. */
+  cellIndex: number
   doc: PageTreeDoc
   dropValidation?: PageTreeDropValidation
   insertAfterDropID: null | string
   insertBeforeDropID: null | string
   isMovePending: boolean
+  /** Index among visible rows; -1 for closing rows. */
   rowIndex: number
   titleCellAccessor: string
 }) {
+  // Closing rows keep this component so a reversed toggle reuses the same <tr>,
+  // but they are disabled and absent from SortableContext items.
+  const isClosing = animation === 'closing'
   const { isOver, setNodeRef } = useDroppable({
     id: getRowDropID(doc.__pageTreeID),
     data: {
@@ -894,7 +915,7 @@ function HierarchyTableRow({
       insertBeforeDropID,
       rowID: doc.__pageTreeID,
     } satisfies Extract<PageTreeDropTarget, { dropType: 'row' }>,
-    disabled: isMovePending,
+    disabled: isMovePending || isClosing,
   })
   const sortable = useSortable({
     id: getSortableRowID(doc.__pageTreeID),
@@ -903,7 +924,7 @@ function HierarchyTableRow({
       parentID: doc.__pageTreeParentID,
       rowID: doc.__pageTreeID,
     } satisfies PageTreeDragData,
-    disabled: !canReorderRows || isMovePending || activeDragType === 'move',
+    disabled: !canReorderRows || isMovePending || activeDragType === 'move' || isClosing,
   })
   const hasActiveMoveDrag = activeDragType === 'move' && Boolean(activeDragRowID)
   const isActiveDragRow = activeDragRowID === doc.__pageTreeID
@@ -923,28 +944,33 @@ function HierarchyTableRow({
     }),
     [sortable.attributes, sortable.isDragging, sortable.listeners, sortable.setActivatorNodeRef],
   )
-  const sortableStyle = React.useMemo(
+  const rowStyle = React.useMemo(
     () =>
-      ({
-        position: sortable.isDragging ? 'relative' : undefined,
-        transform: getSortableTransform(sortable.transform),
-        transition: activeDragType === 'order' ? sortable.transition : undefined,
-        zIndex: sortable.isDragging ? 1 : undefined,
-      }) as React.CSSProperties,
-    [activeDragType, sortable.isDragging, sortable.transform, sortable.transition],
+      isClosing
+        ? undefined
+        : ({
+            position: sortable.isDragging ? 'relative' : undefined,
+            transform: getSortableTransform(sortable.transform),
+            transition: activeDragType === 'order' ? sortable.transition : undefined,
+            zIndex: sortable.isDragging ? 1 : undefined,
+          } as React.CSSProperties),
+    [activeDragType, isClosing, sortable.isDragging, sortable.transform, sortable.transition],
   )
-
   return (
     <tr
-      className={`row-${rowIndex + 1}`}
+      aria-hidden={isClosing ? 'true' : undefined}
+      className={isClosing ? undefined : `row-${rowIndex + 1}`}
       data-drag-over={activeDragType === 'move' && isOver ? 'true' : 'false'}
       data-drop-valid={hasActiveMoveDrag ? (dropValidation?.isValid ? 'true' : 'false') : undefined}
       data-id={doc.id}
       data-is-drag-source={activeDragType === 'move' && isActiveDragRow ? 'true' : 'false'}
       data-is-order-drag-source={sortable.isDragging ? 'true' : 'false'}
-      data-page-tree-row="true"
+      data-page-tree-id={doc.__pageTreeID}
+      data-page-tree-row={isClosing ? undefined : 'true'}
+      data-tree-anim={animation}
+      inert={isClosing}
       ref={setRowRef}
-      style={sortableStyle}
+      style={rowStyle}
     >
       <PageTreeRowDndProvider value={rowDndValue}>
         {activeColumns.map((column, columnIndex) => {
@@ -956,7 +982,7 @@ function HierarchyTableRow({
               data-page-tree-title-cell={accessor === titleCellAccessor ? 'true' : undefined}
               key={columnIndex}
             >
-              {column.renderedCells?.[rowIndex] ?? null}
+              {column.renderedCells?.[cellIndex] ?? null}
             </td>
           )
         })}
@@ -970,22 +996,103 @@ function HierarchyTable({
   activeDragType,
   activeDropTarget,
   allDocsByID,
+  animatedDocs,
+  animationSeq,
   canReorderRows,
+  collapseAnimation,
   columns,
   data,
   isMovePending,
+  onAnimationsSettled,
   titleCellAccessor,
 }: {
   activeDragRowID: null | string
   activeDragType: null | PageTreeDragType
   activeDropTarget: null | PageTreeDropTarget
   allDocsByID: ReadonlyMap<string, PageTreeDoc>
+  /** `data` plus closing rows, in the order of each column's renderedCells. */
+  animatedDocs: PageTreeAnimatedDoc[]
+  /** Latest toggle while rows are animating, otherwise null. */
+  animationSeq: null | number
   canReorderRows: boolean
+  collapseAnimation: PageTreeResolvedCollapseAnimation
   columns: Column[]
+  /** Visible page rows. Drives drag and drop, drop targets, and validation. */
   data: PageTreeDoc[]
   isMovePending: boolean
+  onAnimationsSettled: (seq: number) => void
   titleCellAccessor: string
 }) {
+  const tbodyRef = React.useRef<HTMLTableSectionElement>(null)
+  const animatedDocsRef = React.useRef(animatedDocs)
+  const sectionsRef = React.useRef<
+    { animations: Animation[]; rowIDs: ReadonlySet<string>; seq: number }[]
+  >([])
+
+  animatedDocsRef.current = animatedDocs
+
+  // Animates the rows of each toggle as one collapsible section. A toggle of
+  // the same section mid-animation reverses it; any other toggle finishes it.
+  React.useLayoutEffect(() => {
+    const tbody = tbodyRef.current
+    const container = tbody?.closest<HTMLElement>('.table')
+    const group = animatedDocsRef.current.filter((row) => row.anim && row.seq === animationSeq)
+    const running = sectionsRef.current.at(-1)
+
+    if (animationSeq === null || !tbody || !container || group.length === 0) {
+      return
+    }
+
+    if (running && group.some((row) => running.rowIDs.has(row.doc.__pageTreeID))) {
+      running.seq = animationSeq
+      running.animations.forEach((animation) => animation.reverse())
+      return
+    }
+
+    running?.animations.forEach((animation) => animation.finish())
+
+    const rowElements = Array.from(tbody.children) as HTMLTableRowElement[]
+    const rowIDs = new Set(group.map((row) => row.doc.__pageTreeID))
+    const groupIndexes = rowElements.flatMap((row, index) =>
+      rowIDs.has(row.dataset.pageTreeId ?? '') ? [index] : [],
+    )
+    const section = {
+      animations: animateTreeSection({
+        anim: group[0].anim!,
+        container,
+        durationMs: collapseAnimation.durationMs,
+        sectionRows: rowElements.slice(groupIndexes[0], (groupIndexes.at(-1) ?? -1) + 1),
+      }),
+      rowIDs,
+      seq: animationSeq,
+    }
+
+    sectionsRef.current.push(section)
+    // Animations hold their last frame until the rows re-render (below).
+    void Promise.all(section.animations.map((animation) => animation.finished))
+      .then(() => onAnimationsSettled(section.seq))
+      .catch(() => {})
+  }, [animationSeq, collapseAnimation.durationMs, onAnimationsSettled])
+
+  // Drops a section's animations in the same commit that settles its rows, so
+  // closing rows are never shown again between the last frame and removal.
+  React.useLayoutEffect(() => {
+    const animatingSeqs = new Set(animatedDocs.flatMap((row) => (row.anim ? [row.seq] : [])))
+
+    sectionsRef.current = sectionsRef.current.filter((section) => {
+      if (animatingSeqs.has(section.seq)) {
+        return true
+      }
+
+      section.animations.forEach((animation) => animation.cancel())
+      return false
+    })
+  }, [animatedDocs])
+
+  React.useEffect(
+    () => () => sectionsRef.current.forEach((section) => section.animations.forEach((animation) => animation.cancel())),
+    [],
+  )
   const activeColumns = React.useMemo(() => columns.filter((column) => column?.active), [columns])
   const sortableItems = React.useMemo(
     () => data.map((doc) => getSortableRowID(doc.__pageTreeID)),
@@ -993,6 +1100,10 @@ function HierarchyTable({
   )
   const sortingStrategy = React.useMemo(() => buildPageTreeSortingStrategy(data), [data])
   const insertDropTargets = React.useMemo(() => buildInsertDropTargets(data), [data])
+  const rowIndexByID = React.useMemo(
+    () => new Map(data.map((doc, index) => [doc.__pageTreeID, index])),
+    [data],
+  )
   const insertDropTargetsByReferenceRowID = React.useMemo(
     () => new Map(insertDropTargets.map((dropTarget) => [dropTarget.referenceRowID, dropTarget])),
     [insertDropTargets],
@@ -1069,9 +1180,35 @@ function HierarchyTable({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tbodyRef}>
             <SortableContext items={sortableItems} strategy={sortingStrategy}>
-              {data.map((doc, rowIndex) => {
+              {animatedDocs.map(({ anim, doc }, cellIndex) => {
+                const rowIndex = rowIndexByID.get(doc.__pageTreeID)
+
+                // Same Fragment shape as visible rows (insert slot, then row), so
+                // the <tr> is not remounted when a row starts or stops closing.
+                if (anim === 'closing' || rowIndex === undefined) {
+                  return (
+                    <React.Fragment key={doc.__pageTreeID}>
+                    {null}
+                    <HierarchyTableRow
+                      activeColumns={activeColumns}
+                      activeDragRowID={activeDragRowID}
+                      activeDragType={activeDragType}
+                      animation="closing"
+                      canReorderRows={canReorderRows}
+                      cellIndex={cellIndex}
+                      doc={doc}
+                      insertAfterDropID={null}
+                      insertBeforeDropID={null}
+                      isMovePending={isMovePending}
+                      rowIndex={-1}
+                      titleCellAccessor={titleCellAccessor}
+                    />
+                    </React.Fragment>
+                  )
+                }
+
                 const rootInsertBeforeDropTarget =
                   doc.__pageTreeParentID === null
                     ? insertDropTargetsByReferenceRowID.get(doc.__pageTreeID)
@@ -1109,7 +1246,9 @@ function HierarchyTable({
                       activeColumns={activeColumns}
                       activeDragRowID={activeDragRowID}
                       activeDragType={activeDragType}
+                      animation={anim}
                       canReorderRows={canReorderRows}
+                      cellIndex={cellIndex}
                       doc={doc}
                       dropValidation={rowDropValidationByID.get(doc.__pageTreeID)}
                       insertAfterDropID={
@@ -1137,6 +1276,7 @@ export default function PageTreeListViewClient({
   badgeConfig,
   badgesLinks,
   canMoveDocs,
+  collapseAnimation = DEFAULT_COLLAPSE_ANIMATION,
   columnState,
   homeIndicatorEnabled,
   orderableFieldName,
@@ -1286,18 +1426,6 @@ export default function PageTreeListViewClient({
     () => JSON.stringify([props.collectionSlug, props.viewType, searchParams.toString()]),
     [props.collectionSlug, props.viewType, searchParams],
   )
-  const hierarchyValue = React.useMemo(
-    () => ({
-      activeDragRowID,
-      canMoveDocs,
-      collapsedIDs,
-      parentMoveEnabled,
-      pendingMoveRowID,
-      toggleRow,
-    }),
-    [activeDragRowID, canMoveDocs, collapsedIDs, parentMoveEnabled, pendingMoveRowID, toggleRow],
-  )
-
   React.useEffect(() => {
     let isMounted = true
 
@@ -1356,6 +1484,43 @@ export default function PageTreeListViewClient({
     () => new Map(displayedPaginatedDocs.map((doc) => [doc.__pageTreeID, doc])),
     [displayedPaginatedDocs],
   )
+  const {
+    animatedDocs,
+    docs: renderedDocs,
+    notifyToggle,
+    settle: settleAnimations,
+    toggleSeq: animationSeq,
+  } = usePageTreeCollapseAnimation({
+    config: collapseAnimation,
+    docsByID: allDocsByID,
+    pageDocs: displayedPaginatedDocs,
+    visibleDocs,
+  })
+  const toggleRowAnimated = React.useCallback(
+    (rowID: string) => {
+      notifyToggle()
+      toggleRow(rowID)
+    },
+    [notifyToggle, toggleRow],
+  )
+  const hierarchyValue = React.useMemo(
+    () => ({
+      activeDragRowID,
+      canMoveDocs,
+      collapsedIDs,
+      parentMoveEnabled,
+      pendingMoveRowID,
+      toggleRow: toggleRowAnimated,
+    }),
+    [
+      activeDragRowID,
+      canMoveDocs,
+      collapsedIDs,
+      parentMoveEnabled,
+      pendingMoveRowID,
+      toggleRowAnimated,
+    ],
+  )
   const renderedCellIndexByDocID = React.useMemo(
     () => new Map(renderedRowIDs.map((id, index) => [id, index])),
     [renderedRowIDs],
@@ -1368,14 +1533,28 @@ export default function PageTreeListViewClient({
     () => sliceColumnState(normalizedColumnState, displayedPaginatedDocs, renderedCellIndexByDocID),
     [displayedPaginatedDocs, normalizedColumnState, renderedCellIndexByDocID],
   )
+  // Closing rows need cells too, so the table indexes cells by rendered row.
+  const renderedColumnState = React.useMemo(
+    () =>
+      renderedDocs === displayedPaginatedDocs
+        ? paginatedColumnState
+        : sliceColumnState(normalizedColumnState, renderedDocs, renderedCellIndexByDocID),
+    [
+      displayedPaginatedDocs,
+      normalizedColumnState,
+      paginatedColumnState,
+      renderedCellIndexByDocID,
+      renderedDocs,
+    ],
+  )
   const tableColumns = React.useMemo(
     () =>
       buildTableColumns({
         badgeConfig,
         badgesLinks,
         collectionSlug: props.collectionSlug,
-        columnState: paginatedColumnState,
-        docs: displayedPaginatedDocs,
+        columnState: renderedColumnState,
+        docs: renderedDocs,
         enableRowSelections: props.enableRowSelections,
         homeIndicatorEnabled,
         orderableFieldName,
@@ -1384,8 +1563,8 @@ export default function PageTreeListViewClient({
         useAsTitle,
       }),
     [
-      paginatedColumnState,
-      displayedPaginatedDocs,
+      renderedColumnState,
+      renderedDocs,
       badgeConfig,
       badgesLinks,
       homeIndicatorEnabled,
@@ -1696,10 +1875,14 @@ export default function PageTreeListViewClient({
           activeDragType={activeDragType}
           activeDropTarget={activeDropTarget}
           allDocsByID={allDocsByID}
+          animatedDocs={animatedDocs}
+          animationSeq={animationSeq}
           canReorderRows={canReorderRows}
+          collapseAnimation={collapseAnimation}
           columns={tableColumns}
           data={displayedPaginatedDocs}
           isMovePending={isMovePending}
+          onAnimationsSettled={settleAnimations}
           titleCellAccessor={useAsTitle}
         />
         <DragOverlay dropAnimation={null} style={{ cursor: 'grabbing' }}>
@@ -1715,7 +1898,10 @@ export default function PageTreeListViewClient({
       activeDragType,
       activeDropTarget,
       allDocsByID,
+      animatedDocs,
+      animationSeq,
       canReorderRows,
+      collapseAnimation,
       displayedPaginatedDocs,
       dndContextID,
       handleDragCancel,
@@ -1724,6 +1910,7 @@ export default function PageTreeListViewClient({
       handleDragStart,
       isMovePending,
       sensors,
+      settleAnimations,
       tableColumns,
       useAsTitle,
     ],

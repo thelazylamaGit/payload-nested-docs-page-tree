@@ -294,6 +294,19 @@ describe('nestedDocsPageTreePlugin', () => {
     })
   })
 
+  it('enables the collapse animation by default and accepts a duration or false', () => {
+    const getCollapseAnimation = (
+      collapseAnimation?: Parameters<typeof nestedDocsPageTreePlugin>[0]['collapseAnimation'],
+    ) =>
+      nestedDocsPageTreePlugin({ collapseAnimation, collections: ['pages'] })(
+        buildConfig([buildCollection({ slug: 'pages' })]),
+      ).collections?.[0]?.custom?.nestedDocsPageTreePlugin.collapseAnimation
+
+    expect(getCollapseAnimation()).toEqual({ durationMs: 200, enabled: true })
+    expect(getCollapseAnimation({ durationMs: 180 })).toEqual({ durationMs: 180, enabled: true })
+    expect(getCollapseAnimation(false)).toMatchObject({ enabled: false })
+  })
+
   it('preserves an existing pagination default limit on targeted collections', () => {
     const config = nestedDocsPageTreePlugin({
       collections: ['pages'],

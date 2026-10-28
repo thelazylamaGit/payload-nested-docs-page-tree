@@ -249,14 +249,8 @@ function getCurrentQuery(props: ServerListViewProps, fallbackLimit: number): Lis
 
   return {
     ...mergedQuery,
-    limit: normalizeLimit(
-      getQueryValue(mergedQuery.limit, fallbackLimit),
-      fallbackLimit,
-    ),
-    page: normalizePage(
-      getQueryValue(mergedQuery.page, props.data.page),
-      props.data.page,
-    ),
+    limit: normalizeLimit(getQueryValue(mergedQuery.limit, fallbackLimit), fallbackLimit),
+    page: normalizePage(getQueryValue(mergedQuery.page, props.data.page), props.data.page),
     search: normalizeSearch(mergedQuery.search),
     sort: normalizeSort(mergedQuery.sort) ?? normalizeSort(preferenceQuery.sort) ?? undefined,
     where: normalizeWhere(mergedQuery.where),
@@ -484,21 +478,21 @@ export async function NestedDocsPageTreeListView(props: ServerListViewProps) {
     draft: props.collectionConfig.versions?.drafts ? true : undefined,
     fallbackLocale: false,
     includeLockStatus: true,
-    select:
-      pageTreeConfig.fastMode && !pageTreeConfig.badgesLinks
-        ? getPageTreeListSelect({
-            columns: props.columnState,
-            useAsTitle: props.collectionConfig.admin.useAsTitle,
-            parentFieldSlug: pageTreeConfig.parentFieldSlug,
-            breadcrumbsFieldSlug: pageTreeConfig.breadcrumbsFieldSlug,
-            orderableFieldName,
-            sort: effectiveSort,
-          })
-        : undefined,
     locale,
     overrideAccess: false,
     pagination: false,
     req,
+    select:
+      pageTreeConfig.fastMode && !pageTreeConfig.badgesLinks
+        ? getPageTreeListSelect({
+            breadcrumbsFieldSlug: pageTreeConfig.breadcrumbsFieldSlug,
+            columns: props.columnState,
+            orderableFieldName,
+            parentFieldSlug: pageTreeConfig.parentFieldSlug,
+            sort: effectiveSort,
+            useAsTitle: props.collectionConfig.admin.useAsTitle,
+          })
+        : undefined,
     sort: normalizeSort(query.sort) ?? defaultSort,
     user: props.user,
     where,
@@ -528,12 +522,12 @@ export async function NestedDocsPageTreeListView(props: ServerListViewProps) {
         req,
       })
     : await getDocsWithDisplayStatus({
-        fastMode: pageTreeConfig.fastMode,
         badgesLinks: pageTreeConfig.badgesLinks,
         breadcrumbsFieldSlug: pageTreeConfig.breadcrumbsFieldSlug,
         collectionConfig: props.collectionConfig,
         collectionSlug: props.collectionSlug,
         docs: fullResult.docs as PageTreeSourceDoc[],
+        fastMode: pageTreeConfig.fastMode,
         locale,
         payload: props.payload,
         req,
@@ -629,6 +623,7 @@ export async function NestedDocsPageTreeListView(props: ServerListViewProps) {
       badgeConfig={pageTreeConfig.badges}
       badgesLinks={badgesLinks}
       canMoveDocs={canMoveDocs}
+      collapseAnimation={pageTreeConfig.collapseAnimation}
       columnState={renderedTable.columnState}
       homeIndicatorEnabled={pageTreeConfig.homeIndicator.enabled}
       orderableFieldName={orderableFieldName}
