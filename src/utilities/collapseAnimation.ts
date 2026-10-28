@@ -1,9 +1,12 @@
 import type { NestedDocsPageTreePluginCollapseAnimationConfig } from '../types.js'
 
-export const DEFAULT_COLLAPSE_ANIMATION_DURATION_MS = 200
+export const DEFAULT_COLLAPSE_ANIMATION_DURATION_MS = 160
+/** Starts quickly and settles softly, in both directions. */
+export const DEFAULT_COLLAPSE_ANIMATION_EASING = 'cubic-bezier(0.2, 0, 0, 1)'
 
 export type PageTreeResolvedCollapseAnimation = {
   durationMs: number
+  easing: string
   enabled: boolean
 }
 
@@ -19,20 +22,19 @@ export type PageTreeRenderedRow = {
 export function resolveCollapseAnimationConfig(
   value: NestedDocsPageTreePluginCollapseAnimationConfig | undefined,
 ): PageTreeResolvedCollapseAnimation {
-  if (value === false) {
-    return { durationMs: DEFAULT_COLLAPSE_ANIMATION_DURATION_MS, enabled: false }
-  }
-
+  const options = typeof value === 'object' && value !== null ? value : {}
   const durationMs =
-    typeof value === 'object' &&
-    value !== null &&
-    typeof value.durationMs === 'number' &&
-    Number.isFinite(value.durationMs) &&
-    value.durationMs >= 0
-      ? Math.round(value.durationMs)
+    typeof options.durationMs === 'number' &&
+    Number.isFinite(options.durationMs) &&
+    options.durationMs >= 0
+      ? Math.round(options.durationMs)
       : DEFAULT_COLLAPSE_ANIMATION_DURATION_MS
+  const easing =
+    typeof options.easing === 'string' && options.easing.trim()
+      ? options.easing.trim()
+      : DEFAULT_COLLAPSE_ANIMATION_EASING
 
-  return { durationMs, enabled: durationMs > 0 }
+  return { durationMs, easing, enabled: value !== false && durationMs > 0 }
 }
 
 export function createRenderedRows(pageIDs: readonly string[]): PageTreeRenderedRow[] {

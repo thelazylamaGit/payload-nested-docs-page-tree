@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createRenderedRows,
   DEFAULT_COLLAPSE_ANIMATION_DURATION_MS,
+  DEFAULT_COLLAPSE_ANIMATION_EASING,
   type PageTreeRenderedRow,
   reconcileRenderedRows,
   resolveCollapseAnimationConfig,
@@ -68,23 +69,31 @@ function describeRows(rows: PageTreeRenderedRow[]): string[] {
 }
 
 describe('resolveCollapseAnimationConfig', () => {
-  it('enables the default duration when unset or true', () => {
-    expect(resolveCollapseAnimationConfig(undefined)).toEqual({
+  it('enables a snappy decelerating default when unset or true', () => {
+    const defaults = {
       durationMs: DEFAULT_COLLAPSE_ANIMATION_DURATION_MS,
+      easing: DEFAULT_COLLAPSE_ANIMATION_EASING,
       enabled: true,
-    })
-    expect(resolveCollapseAnimationConfig(true)).toEqual({ durationMs: 200, enabled: true })
+    }
+
+    expect(resolveCollapseAnimationConfig(undefined)).toEqual(defaults)
+    expect(resolveCollapseAnimationConfig(true)).toEqual(defaults)
   })
 
-  it('disables with false or a zero duration and ignores invalid durations', () => {
-    expect(resolveCollapseAnimationConfig(false).enabled).toBe(false)
-    expect(resolveCollapseAnimationConfig({ durationMs: 0 }).enabled).toBe(false)
-    expect(resolveCollapseAnimationConfig({ durationMs: 180.4 })).toEqual({
+  it('accepts a custom duration and easing', () => {
+    expect(resolveCollapseAnimationConfig({ durationMs: 180.4, easing: ' ease-in-out ' })).toEqual({
       durationMs: 180,
+      easing: 'ease-in-out',
       enabled: true,
     })
-    expect(resolveCollapseAnimationConfig({ durationMs: -5 }).durationMs).toBe(200)
-    expect(resolveCollapseAnimationConfig({ durationMs: Number.NaN }).durationMs).toBe(200)
+  })
+
+  it('disables with false or a zero duration and ignores invalid values', () => {
+    expect(resolveCollapseAnimationConfig(false).enabled).toBe(false)
+    expect(resolveCollapseAnimationConfig({ durationMs: 0 }).enabled).toBe(false)
+    expect(resolveCollapseAnimationConfig({ durationMs: -5 }).durationMs).toBe(160)
+    expect(resolveCollapseAnimationConfig({ durationMs: Number.NaN }).durationMs).toBe(160)
+    expect(resolveCollapseAnimationConfig({ easing: '' }).easing).toBe(DEFAULT_COLLAPSE_ANIMATION_EASING)
   })
 })
 

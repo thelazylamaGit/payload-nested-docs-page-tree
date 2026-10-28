@@ -1,6 +1,18 @@
-import type { PageTreeRowAnimation } from '../utilities/collapseAnimation.js'
+import {
+  DEFAULT_COLLAPSE_ANIMATION_EASING,
+  type PageTreeRowAnimation,
+} from '../utilities/collapseAnimation.js'
 
-const EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
+/** Keyframes from hidden to shown; closing plays them backwards in time. */
+function directed(anim: PageTreeRowAnimation, keyframes: Keyframe[]): Keyframe[] {
+  return anim === 'opening'
+    ? keyframes
+    : keyframes
+        .map((keyframe) =>
+          typeof keyframe.offset === 'number' ? { ...keyframe, offset: 1 - keyframe.offset } : keyframe,
+        )
+        .reverse()
+}
 
 /**
  * Opens or closes a run of table rows as one collapsible section.
@@ -8,17 +20,17 @@ const EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
  * Table rows cannot share a wrapper, so the section is animated as a whole:
  * its rows are revealed by one clip edge, the rows below slide with it, and the
  * table container's height follows so content under the table moves too. All
- * animations share one timing, and closing plays the opening in reverse, so a
- * toggle mid-animation only needs `reverse()`. The section rows must be laid
- * out at full height when this is called.
+ * animations share one timing, so a toggle mid-animation only needs
+ * `reverse()`. The section rows must be laid out at full height when this runs.
  */
 export function animateTreeSection(args: {
   anim: PageTreeRowAnimation
   container: HTMLElement
   durationMs: number
+  easing: string
   sectionRows: HTMLTableRowElement[]
 }): Animation[] {
-  const { anim, container, durationMs, sectionRows } = args
+  const { anim, container, durationMs, easing, sectionRows } = args
   const firstRow = sectionRows[0]
   const lastRow = sectionRows.at(-1)
 
@@ -35,9 +47,11 @@ export function animateTreeSection(args: {
   }
 
   const timing: KeyframeAnimationOptions = {
-    direction: anim === 'opening' ? 'normal' : 'reverse',
     duration: durationMs,
-    easing: EASING,
+    // An invalid easing would make animate() throw and leave rows stuck.
+    easing: CSS.supports('transition-timing-function', easing)
+      ? easing
+      : DEFAULT_COLLAPSE_ANIMATION_EASING,
     fill: 'both',
   }
   const animations = sectionRows.map((row) => {
@@ -48,12 +62,12 @@ export function animateTreeSection(args: {
 
     // The row stays hidden until the edge reaches it, then is uncovered top-down.
     return row.animate(
-      [
+      directed(anim, [
         { clipPath: hidden, offset: 0 },
         { clipPath: hidden, offset: start },
         { clipPath: 'inset(0 0 0 0)', offset: end },
         { clipPath: 'inset(0 0 0 0)', offset: 1 },
-      ],
+      ]),
       timing,
     )
   })
@@ -62,7 +76,10 @@ export function animateTreeSection(args: {
   while (row) {
     animations.push(
       row.animate(
-        [{ transform: `translateY(${-sectionHeight}px)` }, { transform: 'translateY(0)' }],
+        directed(anim, [
+          { transform: `translateY(${-sectionHeight}px)` },
+          { transform: 'translateY(0)' },
+        ]),
         timing,
       ),
     )
@@ -71,10 +88,10 @@ export function animateTreeSection(args: {
 
   animations.push(
     container.animate(
-      [
+      directed(anim, [
         { height: `${containerHeight - sectionHeight}px`, overflow: 'clip' },
         { height: `${containerHeight}px`, overflow: 'clip' },
-      ],
+      ]),
       timing,
     ),
   )

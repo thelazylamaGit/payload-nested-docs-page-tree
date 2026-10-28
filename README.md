@@ -343,7 +343,7 @@ pnpm exec payload generate:importmap
 | `defaultLimit` | `100` | List page size |
 | `hideBreadcrumbs` | `true` | Hide the read-only breadcrumbs field |
 | `homeIndicator` | `{ collections: ['pages'] }` | Collections showing a home icon; `false` disables it |
-| `collapseAnimation` | `{ durationMs: 200 }` | Animate nested rows on expand/collapse; `false` disables it. Instant with `prefers-reduced-motion` |
+| `collapseAnimation` | `{ durationMs: 160, easing: 'cubic-bezier(0.2, 0, 0, 1)' }` | Animate nested rows on expand/collapse; `easing` takes any CSS easing, `false` disables it. Instant with `prefers-reduced-motion` |
 | `badges` | Payload defaults | Status labels, colors, and optional locale badges |
 | `badgesLinks` | Disabled | Live and preview links |
 | `publishOnMove` | `false` | Publish moves for pages without pending edits |

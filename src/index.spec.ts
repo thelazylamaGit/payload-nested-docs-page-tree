@@ -302,8 +302,16 @@ describe('nestedDocsPageTreePlugin', () => {
         buildConfig([buildCollection({ slug: 'pages' })]),
       ).collections?.[0]?.custom?.nestedDocsPageTreePlugin.collapseAnimation
 
-    expect(getCollapseAnimation()).toEqual({ durationMs: 200, enabled: true })
-    expect(getCollapseAnimation({ durationMs: 180 })).toEqual({ durationMs: 180, enabled: true })
+    expect(getCollapseAnimation()).toEqual({
+      durationMs: 160,
+      easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      enabled: true,
+    })
+    expect(getCollapseAnimation({ durationMs: 220, easing: 'ease-out' })).toEqual({
+      durationMs: 220,
+      easing: 'ease-out',
+      enabled: true,
+    })
     expect(getCollapseAnimation(false)).toMatchObject({ enabled: false })
   })
 

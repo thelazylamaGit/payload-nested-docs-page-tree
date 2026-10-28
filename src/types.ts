@@ -37,8 +37,10 @@ export type NestedDocsPageTreePluginHomeIndicatorConfig =
 
 export type NestedDocsPageTreePluginCollapseAnimationConfig =
   | {
-      /** @default 200 */
+      /** @default 160 */
       durationMs?: number
+      /** Any CSS easing, such as `ease-out` or `cubic-bezier(0.2, 0, 0, 1)`. @default 'cubic-bezier(0.2, 0, 0, 1)' */
+      easing?: string
     }
   | boolean
 
@@ -117,6 +119,7 @@ export type NestedDocsPageTreePluginCollectionCustom = {
   breadcrumbsFieldSlug: string
   collapseAnimation: {
     durationMs: number
+    easing: string
     enabled: boolean
   }
   defaultLimit: number

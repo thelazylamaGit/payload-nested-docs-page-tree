@@ -1061,6 +1061,7 @@ function HierarchyTable({
         anim: group[0].anim!,
         container,
         durationMs: collapseAnimation.durationMs,
+        easing: collapseAnimation.easing,
         sectionRows: rowElements.slice(groupIndexes[0], (groupIndexes.at(-1) ?? -1) + 1),
       }),
       rowIDs,
@@ -1072,7 +1073,7 @@ function HierarchyTable({
     void Promise.all(section.animations.map((animation) => animation.finished))
       .then(() => onAnimationsSettled(section.seq))
       .catch(() => {})
-  }, [animationSeq, collapseAnimation.durationMs, onAnimationsSettled])
+  }, [animationSeq, collapseAnimation.durationMs, collapseAnimation.easing, onAnimationsSettled])
 
   // Drops a section's animations in the same commit that settles its rows, so
   // closing rows are never shown again between the last frame and removal.
